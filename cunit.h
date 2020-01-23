@@ -92,11 +92,11 @@ typedef struct _CUnitContext {
 		} \
 		\
 		PRINTF("   Value of '" #__cond "' is %s (expected: %s)\n", __val ? "FALSE" : "TRUE", __val ? "TRUE" : "FALSE"); \
+		result->ret = 1; \
 		\
 		if (__assert) { \
-			result->ret = 1; \
+			return; \
 		} \
-		return; \
 	} \
 }
 
@@ -143,8 +143,8 @@ typedef struct _CUnitContext {
 			PRINTF("%s:%d: unexpected value!\n", __FILE__, __LINE__); \
 		} \
 		\
-		PRINTF("   Expected: "); __type_print(v1); PRINTF("\n"); \
-		PRINTF("   Have:     "); __type_print(v2); PRINTF("\n"); \
+		PRINTF("   Expected: " #__op " "); __type_print(v2); PRINTF("\n"); \
+		PRINTF("   Have:     "); __type_print(v1); PRINTF("\n"); \
 		result->ret = 1; \
 		\
 		if (__assert) { \
@@ -242,10 +242,12 @@ typedef struct _CUnitContext {
 				\
 				if (IS_NULL(group->testHead)) { \
 					group->testHead = group->testTail = test; \
+					\
+				} else { \
+					group->testTail->next = test; \
+					group->testTail       = test; \
 				} \
 				\
-				group->testTail->next = test; \
-				group->testTail       = test; \
 				group->testCount++; \
 				\
 				CUNIT_CTX_NAME.totalTests++; \
@@ -287,7 +289,7 @@ int cunit_main(int argc, char *argv[]) {
 				CUNIT_CTX_NAME.failed++;
 			}
 
-			PRINTF("[ %s  ] Test %s:%s, asserts: %d, expects: %d\n",
+			PRINTF("[ %s  ] Test %s:%s, asserts: %d, expectations: %d\n",
 				(result.ret == 0) ? CUNIT_STRING_OK : CUNIT_STRING_FAILED, group->name, test->name,
 				result.asserts, result.expects
 			);
