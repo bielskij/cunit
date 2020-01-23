@@ -1,0 +1,80 @@
+#include "cunit.h"
+
+
+CUNIT_TEST(int, expect_passed) {
+	int a = 10;
+
+	CUNIT_EXPECT_TRUE(a == 10);
+	CUNIT_EXPECT_FALSE(a == 1);
+
+	CUNIT_EXPECT_EQ(a, 10);
+	CUNIT_EXPECT_GE(a, 10);
+	CUNIT_EXPECT_GT(a, 3);
+	CUNIT_EXPECT_LE(a, 10);
+	CUNIT_EXPECT_LT(a, 11);
+	CUNIT_EXPECT_NE(a, 123);
+}
+
+CUNIT_TEST(int, expect_failed) {
+	int a = 10;
+
+	CUNIT_EXPECT_TRUE(a != 10);
+	CUNIT_EXPECT_FALSE(a == 10);
+
+	CUNIT_EXPECT_EQ(a, 11);
+	CUNIT_EXPECT_GE(a, 11);
+	CUNIT_EXPECT_GT(a, 11);
+	CUNIT_EXPECT_LE(a, 2);
+	CUNIT_EXPECT_LT(a, 2);
+	CUNIT_EXPECT_NE(a, 10);
+}
+
+CUNIT_TEST(float, expect_passed) {
+	float a = 10;
+
+	CUNIT_EXPECT_TRUE(a == 10.0);
+	CUNIT_EXPECT_FALSE(a == 1.0);
+
+	CUNIT_EXPECT_EQ(a, 10.0);
+	CUNIT_EXPECT_GE(a, 10.0);
+	CUNIT_EXPECT_GT(a, 3.0);
+	CUNIT_EXPECT_LE(a, 10.0);
+	CUNIT_EXPECT_LT(a, 11.0);
+	CUNIT_EXPECT_NE(a, 123.0);
+}
+
+CUNIT_TEST(float, expect_failed) {
+	float a = 10;
+
+	CUNIT_EXPECT_TRUE(a != 10.0);
+	CUNIT_EXPECT_FALSE(a == 10.0);
+
+	CUNIT_EXPECT_EQ(a, 11.0);
+	CUNIT_EXPECT_GE(a, 11.0);
+	CUNIT_EXPECT_GT(a, 11.0);
+	CUNIT_EXPECT_LE(a, 2.0);
+	CUNIT_EXPECT_LT(a, 2.0);
+	CUNIT_EXPECT_NE(a, 10.0);
+}
+
+CUNIT_TEST(int, assert_passed) {
+	int a = 10;
+
+	CUNIT_ASSERT_TRUE(a == 10);
+	CUNIT_ASSERT_FALSE(a == 1);
+
+	CUNIT_ASSERT_EQ(a, 10);
+	CUNIT_ASSERT_GE(a, 10);
+	CUNIT_ASSERT_GT(a, 3);
+	CUNIT_ASSERT_LE(a, 10);
+	CUNIT_ASSERT_LT(a, 11);
+
+	CUNIT_ASSERT_LT(a, 2);
+
+	CUNIT_ASSERT_NE(a, 123);
+}
+
+
+CUNIT_GLOBALS;
+
+CUNIT_MAIN();
