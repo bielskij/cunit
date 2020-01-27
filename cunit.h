@@ -12,6 +12,8 @@
 #include <stdio.h>
 
 #include <stddef.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 #define IS_NULL(x)  ((x) == ((void *) 0))
 #define NOT_NULL(x) (! IS_NULL(x))
@@ -76,6 +78,8 @@ typedef struct _CUnitContext {
 
 #define PRINTF(__format...) fprintf(stdout, __format)
 
+#define CUNIT_MSG(__format...) { fprintf(stdout, "MSG: "); fprintf(stdout, __format); fprintf(stdout, "\n"); }
+
 
 #define CUNIT_TEST_BASIC(__cond, __val, __assert) { \
 	if (__assert) { \
@@ -120,9 +124,9 @@ typedef struct _CUnitContext {
 		float              : "%f", \
 		double             : "%f", \
 		long double        : "%Lf", \
-		default            : _Generic((_val - _val), \
-		ptrdiff_t          : "%p", \
-		default            : "undef")), \
+		void *             : "%p", \
+		uint8_t            : "%"PRId8, \
+		default            : "undef"), \
 		(_val))
 #endif
 
@@ -205,19 +209,19 @@ typedef struct _CUnitContext {
 
 #define CUNIT_TEST(__group, __name) \
 	CUNIT_CTX_EXT; \
-\
+	\
 	static void __CUNIT_TEST_FUNC_NAME(__group, __name, main) (CUnitTestResult *result); \
 	static void __CUNIT_TEST_FUNC_NAME(__group, __name, init) () CUNIT_ATTR_CONSTRUCTOR; \
 	static void __CUNIT_TEST_FUNC_NAME(__group, __name, init) () { \
 		CUnitTestGroup *group = CUNIT_CTX_NAME.groups; \
-\
+		\
 		while (NOT_NULL(group)) { \
 			if (strcmp(group->name, #__group) == 0) { \
 				break; \
 			} \
 			group = group->next; \
 		} \
-\
+		\
 		if (IS_NULL(group)) {\
 			group = (CUnitTestGroup *) malloc(sizeof(*group));\
 			if (NOT_NULL(group)) { \
