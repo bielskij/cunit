@@ -19,7 +19,7 @@
 #define NOT_NULL(x) (! IS_NULL(x))
 #define _STR(x) (#x)
 
-#define CUNIT_NAME_LENGTH_MAX 32
+#define CUNIT_NAME_LENGTH_MAX 64
 
 #define CUNIT_CTX_NAME       __cunitGlobals
 #define CUNIT_CTX            CUnitContext CUNIT_CTX_NAME;
@@ -47,7 +47,7 @@ typedef void (*CUnitTestRoutine)(CUnitTestResult *result);
 
 
 typedef struct _CUnitTest {
-	char             name[CUNIT_NAME_LENGTH_MAX];
+	char             name[CUNIT_NAME_LENGTH_MAX + 1];
 	CUnitTestRoutine routine;
 
 	struct _CUnitTest *next;
@@ -55,7 +55,7 @@ typedef struct _CUnitTest {
 
 
 typedef struct _CUnitTestGroup {
-	char name[CUNIT_NAME_LENGTH_MAX];
+	char name[CUNIT_NAME_LENGTH_MAX + 1];
 	int  testCount;
 
 	struct _CUnitTestGroup *next;
