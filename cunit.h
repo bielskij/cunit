@@ -151,8 +151,11 @@ typedef struct _CUnitContext {
 	void __type_print(uint32_t val) CUNIT_ATTR_WEAK;
 	void __type_print(uint32_t val) { PRINTF("%" PRIu32, val); }
 
-	void __type_print(void *val) CUNIT_ATTR_WEAK;
-	void __type_print(void * val) { PRINTF("%p", val); }
+	void __type_print(size_t val) CUNIT_ATTR_WEAK;
+	void __type_print(size_t val) { PRINTF("%zd", val); }
+
+	void __type_print(const void *val) CUNIT_ATTR_WEAK;
+	void __type_print(const void *val) { PRINTF("%p", val); }
 #endif
 
 #ifdef __cplusplus
@@ -292,9 +295,13 @@ typedef struct _CUnitContext {
 \
 	static void __CUNIT_TEST_FUNC_NAME(__group, __name, main) (CUnitTestResult *result)
 
-
+#ifdef __cplusplus
+int cunit_main(int /*argc*/, char /* *argv[]*/) CUNIT_ATTR_WEAK;
+int cunit_main(int /*argc*/, char /* *argv[]*/) {
+#else
 int cunit_main(int argc, char *argv[]) CUNIT_ATTR_WEAK;
 int cunit_main(int argc, char *argv[]) {
+#endif
 	CUNIT_CTX_EXT;
 
 	CUnitTestGroup *group = CUNIT_CTX_NAME.groups;
