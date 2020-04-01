@@ -296,8 +296,8 @@ typedef struct _CUnitContext {
 	static void __CUNIT_TEST_FUNC_NAME(__group, __name, main) (CUnitTestResult *result)
 
 #ifdef __cplusplus
-int cunit_main(int /*argc*/, char /* *argv[]*/) CUNIT_ATTR_WEAK;
-int cunit_main(int /*argc*/, char /* *argv[]*/) {
+int cunit_main(int /*argc*/, char */*argv*/[]) CUNIT_ATTR_WEAK;
+int cunit_main(int /*argc*/, char */*argv*/[]) {
 #else
 int cunit_main(int argc, char *argv[]) CUNIT_ATTR_WEAK;
 int cunit_main(int argc, char *argv[]) {
