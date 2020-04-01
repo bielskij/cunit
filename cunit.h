@@ -50,6 +50,9 @@ typedef struct _CUnitTest {
 	char             name[CUNIT_NAME_LENGTH_MAX + 1];
 	CUnitTestRoutine routine;
 
+	int            (*init)();
+	void           (*term)();
+
 	struct _CUnitTest *next;
 } CUnitTest;
 
@@ -241,7 +244,7 @@ typedef struct _CUnitContext {
 
 #define __CUNIT_TEST_FUNC_NAME(_group, _name, _type) cunit_test_ ## _group ## _ ## _name ## _ ## _type
 
-#define CUNIT_TEST(__group, __name) \
+#define CUNIT_TEST_EX(__group, __name, __init, __term) \
 	CUNIT_CTX_EXT; \
 	\
 	static void __CUNIT_TEST_FUNC_NAME(__group, __name, main) (CUnitTestResult *result); \
@@ -276,6 +279,8 @@ typedef struct _CUnitContext {
 				\
 				test->next    = 0;\
 				test->routine = __CUNIT_TEST_FUNC_NAME(__group, __name, main); \
+				test->init    = __init; \
+				test->term    = __term; \
 				strncpy(test->name, #__name, CUNIT_NAME_LENGTH_MAX); \
 				\
 				if (IS_NULL(group->testHead)) { \
@@ -294,6 +299,9 @@ typedef struct _CUnitContext {
 	}; \
 \
 	static void __CUNIT_TEST_FUNC_NAME(__group, __name, main) (CUnitTestResult *result)
+
+#define CUNIT_TEST(__group, __name) CUNIT_TEST_EX(__group, __name, NULL, NULL)
+
 
 #ifdef __cplusplus
 int cunit_main(int /*argc*/, char */*argv*/[]) CUNIT_ATTR_WEAK;
@@ -322,7 +330,29 @@ int cunit_main(int argc, char *argv[]) {
 
 			PRINTF("[ RUNNING ] Test %s:%s\n", group->name, test->name);
 
-			test->routine(&result);
+			{
+				int initRet = 0;
+
+				if (test->init != NULL) {
+					initRet = test->init();
+					if (initRet != 0) {
+						CUNIT_MSG("Initialize method has failed!");
+					}
+				}
+
+				if (initRet == 0) {
+					test->routine(&result);
+				}
+
+				if (initRet == 0) {
+					if (test->term != NULL) {
+						test->term();
+					}
+
+				} else {
+					result.ret = initRet;
+				}
+			}
 
 			if (result.ret == 0) {
 				CUNIT_CTX_NAME.passed++;
