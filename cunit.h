@@ -10,13 +10,18 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include <stddef.h>
 #include <stdint.h>
 #include <inttypes.h>
 
+#if !defined IS_NULL
 #define IS_NULL(x)  ((x) == ((void *) 0))
+#endif
+#if !defined NOT_NULL
 #define NOT_NULL(x) (! IS_NULL(x))
+#endif
 #define _STR(x) (#x)
 
 #define CUNIT_NAME_LENGTH_MAX 64
@@ -71,6 +76,7 @@ typedef struct _CUnitContext {
 	CUnitTestGroup *groups;
 
 	int totalTests;
+	int executedTests;
 	int groupCount;
 
 	int passed;
@@ -86,9 +92,9 @@ typedef struct _CUnitContext {
 
 #define CUNIT_TEST_BASIC(__cond, __val, __assert) { \
 	if (__assert) { \
-		result->asserts++; \
+		_cunitResult->asserts++; \
 	} else { \
-		result->expects++; \
+		_cunitResult->expects++; \
 	} \
 	\
 	if ((__cond) != __val) { \
@@ -99,7 +105,7 @@ typedef struct _CUnitContext {
 		} \
 		\
 		PRINTF("   Value of '" #__cond "' is %s (expected: %s)\n", __val ? "FALSE" : "TRUE", __val ? "TRUE" : "FALSE"); \
-		result->ret = 1; \
+		_cunitResult->ret = 1; \
 		\
 		if (__assert) { \
 			return; \
@@ -162,16 +168,21 @@ typedef struct _CUnitContext {
 #endif
 
 #ifdef __cplusplus
+	#if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1900)
 	#define __typeof_word decltype
+#else
+	#define __typeof_word typeof
+#endif
+
 #else
 	#define __typeof_word typeof
 #endif
 
 #define CUNIT_TEST_BINARY(__val1, __val2, __op, __assert) { \
 	if (__assert) { \
-		result->asserts++; \
+		_cunitResult->asserts++; \
 	} else { \
-		result->expects++; \
+		_cunitResult->expects++; \
 	} \
 	\
 	if (! ((__val1) __op (__val2))) { \
@@ -186,7 +197,7 @@ typedef struct _CUnitContext {
 		\
 		PRINTF("   Expected: " #__op " "); __type_print(v2); PRINTF("\n"); \
 		PRINTF("   Have:     "); __type_print(v1); PRINTF("\n"); \
-		result->ret = 1; \
+		_cunitResult->ret = 1; \
 		\
 		if (__assert) { \
 			return; \
@@ -210,9 +221,9 @@ typedef struct _CUnitContext {
 
 #define CUNIT_TEST_STRING(__str1, __str2, __comp, __op, __val, __assert) { \
 	if (__assert) { \
-		result->asserts++; \
+		_cunitResult->asserts++; \
 	} else { \
-		result->expects++; \
+		_cunitResult->expects++; \
 	} \
 	\
 	if (! (__comp((__str1), (__str2)) __op __val)) { \
@@ -224,7 +235,7 @@ typedef struct _CUnitContext {
 		\
 		PRINTF("   Expected: '%s'\n", (__str1)); \
 		PRINTF("   Have:     '%s'\n", (__str2)); \
-		result->ret = 1; \
+		_cunitResult->ret = 1; \
 		\
 		if (__assert) { \
 			return; \
@@ -247,7 +258,7 @@ typedef struct _CUnitContext {
 #define CUNIT_TEST_EX(__group, __name, __init, __term) \
 	CUNIT_CTX_EXT; \
 	\
-	static void __CUNIT_TEST_FUNC_NAME(__group, __name, main) (CUnitTestResult *result); \
+	static void __CUNIT_TEST_FUNC_NAME(__group, __name, main) (CUnitTestResult *_cunitResult); \
 	static void __CUNIT_TEST_FUNC_NAME(__group, __name, init) () CUNIT_ATTR_CONSTRUCTOR; \
 	static void __CUNIT_TEST_FUNC_NAME(__group, __name, init) () { \
 		CUnitTestGroup *group = CUNIT_CTX_NAME.groups; \
@@ -298,89 +309,148 @@ typedef struct _CUnitContext {
 		} \
 	}; \
 \
-	static void __CUNIT_TEST_FUNC_NAME(__group, __name, main) (CUnitTestResult *result)
+	static void __CUNIT_TEST_FUNC_NAME(__group, __name, main) (CUnitTestResult *_cunitResult)
 
 #define CUNIT_TEST(__group, __name) CUNIT_TEST_EX(__group, __name, NULL, NULL)
 
+static void _cunit_execute_test(CUnitContext *_cunitCtx, CUnitTestGroup *_cunitGroup, CUnitTest *_cunitTest) {
+	CUnitTestResult _cunitResult;
+
+	memset(&_cunitResult, 0, sizeof(_cunitResult));
+
+	PRINTF("[ RUNNING ] Test %s:%s\n", _cunitGroup->name, _cunitTest->name);
+
+	{
+		int initRet = 0;
+
+		if (_cunitTest->init != NULL) {
+			initRet = _cunitTest->init();
+			if (initRet != 0) {
+				CUNIT_MSG("Initialize method has failed!");
+			}
+		}
+
+		if (initRet == 0) {
+			_cunitTest->routine(&_cunitResult);
+		}
+
+		if (initRet == 0) {
+			if (_cunitTest->term != NULL) {
+				_cunitTest->term();
+			}
+
+		} else {
+			_cunitResult.ret = initRet;
+		}
+	}
+
+	if (_cunitResult.ret == 0) {
+		_cunitCtx->passed++;
+
+	} else {
+		_cunitCtx->failed++;
+	}
+
+	_cunitCtx->executedTests++;
+
+	PRINTF("[ %s  ] Test %s:%s, asserts: %d, expectations: %d\n",
+		(_cunitResult.ret == 0) ? CUNIT_STRING_OK : CUNIT_STRING_FAILED, _cunitGroup->name, _cunitTest->name,
+		_cunitResult.asserts, _cunitResult.expects
+	);
+}
+
+
+static void _cunit_execute_group(CUnitContext *ctx, CUnitTestGroup *group) {
+	CUnitTest *test = group->testHead;
+
+	while (NOT_NULL(test)) {
+		_cunit_execute_test(ctx, group, test);
+
+		test = test->next;
+	}
+
+	PRINTF("[---------]\n");
+}
+
 
 #ifdef __cplusplus
-int cunit_main(int /*argc*/, char */*argv*/[]) CUNIT_ATTR_WEAK;
-int cunit_main(int /*argc*/, char */*argv*/[]) {
+int cunit_main(int argc, char *argv[]) CUNIT_ATTR_WEAK;
+int cunit_main(int argc, char *argv[]) {
 #else
 int cunit_main(int argc, char *argv[]) CUNIT_ATTR_WEAK;
 int cunit_main(int argc, char *argv[]) {
 #endif
 	CUNIT_CTX_EXT;
 
-	CUnitTestGroup *group = CUNIT_CTX_NAME.groups;
+	if (argc > 1) {
+		int opt;
 
-	PRINTF("[=========] Running %d test%c from %d group%c\n",
-		CUNIT_CTX_NAME.totalTests,
-		CUNIT_CTX_NAME.totalTests == 1 ? '\0' : 's', CUNIT_CTX_NAME.groupCount,
-		CUNIT_CTX_NAME.groupCount == 1 ? '\0' : 's'
-	);
+		while ((opt = getopt(argc, argv, "t:g:")) != -1) {
+			switch (opt) {
+				case 't':
+					{
+						CUnitTestGroup *group = CUNIT_CTX_NAME.groups;
 
-	while (NOT_NULL(group)) {
-		CUnitTest *test = group->testHead;
+						while (NOT_NULL(group)) {
+							CUnitTest *test = group->testHead;
 
-		while (NOT_NULL(test)) {
-			CUnitTestResult result;
+							while (NOT_NULL(test)) {
+								if (strcmp(test->name, optarg) == 0) {
+									_cunit_execute_test(&CUNIT_CTX_NAME, group, test);
+								}
 
-			memset(&result, 0, sizeof(result));
+								test = test->next;
+							}
 
-			PRINTF("[ RUNNING ] Test %s:%s\n", group->name, test->name);
-
-			{
-				int initRet = 0;
-
-				if (test->init != NULL) {
-					initRet = test->init();
-					if (initRet != 0) {
-						CUNIT_MSG("Initialize method has failed!");
+							group = group->next;
+						}
 					}
-				}
+					break;
 
-				if (initRet == 0) {
-					test->routine(&result);
-				}
+				case 'g':
+					{
+						CUnitTestGroup *group = CUNIT_CTX_NAME.groups;
 
-				if (initRet == 0) {
-					if (test->term != NULL) {
-						test->term();
+						while (NOT_NULL(group)) {
+							if (strcmp(group->name, optarg) == 0) {
+								_cunit_execute_group(&CUNIT_CTX_NAME, group);
+							}
+
+							group = group->next;
+						}
 					}
+					break;
 
-				} else {
-					result.ret = initRet;
-				}
+				default: /* '?' */
+					fprintf(stderr, "Usage: %s [-t test_name,test_name,...] [-g group_name,group_name,..]\n", argv[0]);
+
+					exit(EXIT_FAILURE);
 			}
-
-			if (result.ret == 0) {
-				CUNIT_CTX_NAME.passed++;
-
-			} else {
-				CUNIT_CTX_NAME.failed++;
-			}
-
-			PRINTF("[ %s  ] Test %s:%s, asserts: %d, expectations: %d\n",
-				(result.ret == 0) ? CUNIT_STRING_OK : CUNIT_STRING_FAILED, group->name, test->name,
-				result.asserts, result.expects
-			);
-
-			test = test->next;
 		}
 
-		PRINTF("[---------]\n");
+	} else {
+		CUnitTestGroup *group = CUNIT_CTX_NAME.groups;
 
-		group = group->next;
+		PRINTF("[=========] Running %d test%c from %d group%c\n",
+			CUNIT_CTX_NAME.totalTests,
+			CUNIT_CTX_NAME.totalTests == 1 ? '\0' : 's', CUNIT_CTX_NAME.groupCount,
+			CUNIT_CTX_NAME.groupCount == 1 ? '\0' : 's'
+		);
+
+		while (NOT_NULL(group)) {
+			_cunit_execute_group(&CUNIT_CTX_NAME, group);
+
+			group = group->next;
+		}
 	}
 
 	PRINTF("[=========]\n");
 	PRINTF("[ %s  ] Executed %d tests, passed: %d, failed: %d\n",
 		CUNIT_CTX_NAME.failed > 0 ? CUNIT_STRING_FAILED : CUNIT_STRING_PASSED,
-		CUNIT_CTX_NAME.totalTests, CUNIT_CTX_NAME.passed, CUNIT_CTX_NAME.failed
+		CUNIT_CTX_NAME.executedTests, CUNIT_CTX_NAME.passed, CUNIT_CTX_NAME.failed
 	);
 
-	return 0;
+	return CUNIT_CTX_NAME.failed > 0 ? 1 : 0;
 }
 
 #define CUNIT_GLOBALS CUnitContext CUNIT_CTX_NAME = { 0 };
